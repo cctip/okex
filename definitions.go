@@ -458,8 +458,8 @@ func (t BarSize) Duration() time.Duration {
 	return time.Minute
 }
 
-func S2M(i interface{}) map[string]string {
-	m := make(map[string]string)
+func S2M(i interface{}) map[string]any {
+	m := make(map[string]any)
 	j, _ := json.Marshal(i)
 	_ = json.Unmarshal(j, &m)
 
