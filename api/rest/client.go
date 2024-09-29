@@ -53,7 +53,7 @@ func NewClient(apiKey, secretKey, passphrase string, baseURL okex.BaseURL, desti
 }
 
 // Do the http request to the server
-func (c *ClientRest) Do(method, path string, private bool, params ...map[string]any) (*http.Response, error) {
+func (c *ClientRest) Do(method, path string, private bool, params ...map[string]string) (*http.Response, error) {
 	u := fmt.Sprintf("%s%s", c.baseURL, path)
 	var (
 		r    *http.Request
@@ -70,8 +70,66 @@ func (c *ClientRest) Do(method, path string, private bool, params ...map[string]
 		if len(params) > 0 {
 			q := r.URL.Query()
 			for k, v := range params[0] {
-				tmp := v.(string)
-				q.Add(k, strings.ReplaceAll(tmp, "\"", ""))
+				q.Add(k, strings.ReplaceAll(v, "\"", ""))
+			}
+			r.URL.RawQuery = q.Encode()
+			if len(params[0]) > 0 {
+				path += "?" + r.URL.RawQuery
+			}
+		}
+	} else {
+		j, err = json.Marshal(params[0])
+		if err != nil {
+			return nil, err
+		}
+		body = string(j)
+		if body == "{}" {
+			body = ""
+		}
+		r, err = http.NewRequest(method, u, bytes.NewBuffer(j))
+		if err != nil {
+			return nil, err
+		}
+		r.Header.Add("Content-Type", "application/json")
+	}
+	if err != nil {
+		return nil, err
+	}
+	if private {
+		timestamp, sign := c.sign(method, path, body)
+		r.Header.Add("OK-ACCESS-KEY", c.apiKey)
+		r.Header.Add("OK-ACCESS-PASSPHRASE", c.passphrase)
+		r.Header.Add("OK-ACCESS-SIGN", sign)
+		r.Header.Add("OK-ACCESS-TIMESTAMP", timestamp)
+	}
+	if c.destination == okex.DemoServer {
+		r.Header.Add("x-simulated-trading", "1")
+	}
+	return c.client.Do(r)
+}
+
+// 提现特别使用
+func (c *ClientRest) Do2(method, path string, private bool, params ...map[string]any) (*http.Response, error) {
+	u := fmt.Sprintf("%s%s", c.baseURL, path)
+	var (
+		r    *http.Request
+		err  error
+		j    []byte
+		body string
+	)
+	if method == http.MethodGet {
+		r, err = http.NewRequest(http.MethodGet, u, nil)
+		if err != nil {
+			return nil, err
+		}
+
+		if len(params) > 0 {
+			q := r.URL.Query()
+			for k, v := range params[0] {
+				tmp, ok := v.(string)
+				if ok {
+					q.Add(k, strings.ReplaceAll(tmp, "\"", ""))
+				}
 			}
 			r.URL.RawQuery = q.Encode()
 			if len(params[0]) > 0 {
