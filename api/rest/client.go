@@ -4,6 +4,7 @@ import (
 	"bytes"
 	"crypto/hmac"
 	"crypto/sha256"
+	"crypto/tls"
 	"encoding/base64"
 	"encoding/json"
 	"fmt"
@@ -11,6 +12,7 @@ import (
 	requests "github.com/amir-the-h/okex/requests/rest/public"
 	responses "github.com/amir-the-h/okex/responses/public_data"
 	"net/http"
+	"net/url"
 	"strings"
 	"time"
 )
@@ -41,6 +43,30 @@ func NewClient(apiKey, secretKey, passphrase string, baseURL okex.BaseURL, desti
 		baseURL:     baseURL,
 		destination: destination,
 		client:      http.DefaultClient,
+	}
+	c.Account = NewAccount(c)
+	c.SubAccount = NewSubAccount(c)
+	c.Trade = NewTrade(c)
+	c.Funding = NewFunding(c)
+	c.Market = NewMarket(c)
+	c.PublicData = NewPublicData(c)
+	c.TradeData = NewTradeData(c)
+	return c
+}
+
+func NewProxyClient(apiKey, secretKey, passphrase string, baseURL okex.BaseURL, destination okex.Destination, proxyUrl *url.URL) *ClientRest {
+	c := &ClientRest{
+		apiKey:      apiKey,
+		secretKey:   []byte(secretKey),
+		passphrase:  passphrase,
+		baseURL:     baseURL,
+		destination: destination,
+		client: &http.Client{
+			Transport: &http.Transport{
+				Proxy:           http.ProxyURL(proxyUrl),
+				TLSClientConfig: &tls.Config{InsecureSkipVerify: true},
+			},
+		},
 	}
 	c.Account = NewAccount(c)
 	c.SubAccount = NewSubAccount(c)

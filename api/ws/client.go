@@ -12,6 +12,7 @@ import (
 	"github.com/gorilla/websocket"
 	"io"
 	"net/http"
+	"net/url"
 	"sync"
 	"time"
 )
@@ -67,6 +68,34 @@ func NewClient(ctx context.Context, apiKey, secretKey, passphrase string, url ma
 		DoneChan:     make(chan interface{}),
 		conn:         make(map[bool]*websocket.Conn),
 		dialer:       websocket.DefaultDialer,
+		lastTransmit: make(map[bool]*time.Time),
+		mu:           map[bool]*sync.RWMutex{true: {}, false: {}},
+	}
+	c.Private = NewPrivate(c)
+	c.Public = NewPublic(c)
+	c.Trade = NewTrade(c)
+	return c
+}
+
+func NewProxyClient(ctx context.Context, apiKey, secretKey, passphrase string, url map[bool]okex.BaseURL, proxyUrl *url.URL) *ClientWs {
+
+	dialer := &websocket.Dialer{
+		Proxy:            http.ProxyURL(proxyUrl),
+		HandshakeTimeout: 45 * time.Second,
+	}
+
+	ctx, cancel := context.WithCancel(ctx)
+	c := &ClientWs{
+		apiKey:       apiKey,
+		secretKey:    []byte(secretKey),
+		passphrase:   passphrase,
+		ctx:          ctx,
+		Cancel:       cancel,
+		url:          url,
+		sendChan:     map[bool]chan []byte{true: make(chan []byte, 3), false: make(chan []byte, 3)},
+		DoneChan:     make(chan interface{}),
+		conn:         make(map[bool]*websocket.Conn),
+		dialer:       dialer,
 		lastTransmit: make(map[bool]*time.Time),
 		mu:           map[bool]*sync.RWMutex{true: {}, false: {}},
 	}
